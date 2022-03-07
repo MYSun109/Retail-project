@@ -1,0 +1,608 @@
+---
+title: "3550 Retail Project"
+author: "Mengyu Sun 30864933"
+date: "2021/5/28"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(fpp3)
+library(tidyverse)
+library(ggplot2)
+```
+
+### INTRODUCTION
+This report explores patterns over time and produces forecasts of Supermarket and grocery stores turnover in South Australia. As it can be seen in the plots below, we can find that the data has clear trend and seasonality, and it is a non-stationary series.
+
+###Q1 A discussion of the statistical features of the original data.
+
+```{r}
+set.seed(30864933)
+myseries <- aus_retail %>%
+  filter(`Series ID` == sample(aus_retail$`Series ID`,1),
+    Month < yearmonth("2018 Jan") )
+myseries
+```
+### For the statistical table
+we can find the mean of the Turnover of Supermarket and grocery stores industry in South Australia is 305.6161, and the median is 238, the variance is 31854.37, the minimum is 80.6, whereas the maximum is 760.5. Also, I can find the 25%, 50% and 75% quantile of Supermarket and grocery stores turnover is 154.4, 238 and 475 respectively.
+```{r}
+ myseries %>%
+  features(Turnover,list(mean=mean, median=median,var=var))%>%
+  arrange(mean)
+myseries %>%
+  features(Turnover, quantile)
+
+```
+Here the minimum is labeled 0% and the maximum is labeled 100%
+
+### For the plots
+[figure 1] 
+There is a clear upward trend for Supermarket and grocery stores retail turnover from April 1982 to December 2017. This may be because people’s living standards have improved and the number of people has also increased over time, leading to an overall upward trend in Turnover, despite seasonal fluctuations.
+Also, we can find the variance increases over time.
+[figure 2]
+From the STL decomposition plot, we can find that:
+The South Australia Supermarket and grocery stores turnover has been decomposed into 3 components (trend, seasonality, and remainder) using an STL decomposition.
+
+1, The trend element has been captured well by the decomposition, as it smoothly increases with a similar pattern to the data. The trend is of the similar scale as the data (indicated by similarly sized grey bars), and contributes most to the decomposition (having the smallest scale bar).
+
+2, The seasonal component increases throughout the series. 
+Also, I can find that the variance of seasonality is also increasing. The peaks in each pattern increase over time.
+
+3, I can find from remainder curve that the range of fluctuations increases with time.-- this component is the smallest contribution original data (having the largest scale bar). 
+
+[figure 3]
+In this case, a "season" is a month. It is clear that there is an increase in turnover from November to December each year. We can also see a maximum in December each year.
+
+This may be because every Christmas, people have the custom of buying things, so people will buy a lot of things, thereby increasing the turnover. This is also the reason for the decline in sales from January to February. Because of the large amount of hoarding in December, people will reduce their purchases in the next two months. Other months were relatively flat, and turnover did not fluctuate significantly. We can also find that as the years increase, this phenomenon becomes more serious (the sales volume increased sharply in December, and fell sharply in January and February). This may be because with the improvement of living standards, people pay more and more attention to festivals. 
+Therefore, the influence of festivals on turnover is becoming more and more obvious.
+
+[figure 4]
+In this graph, we can see the means for each month are approximately 300 Million AUD over years(from blue horizontal lines）except December(around 350 million AUD). we can also see the changes in seasonality over time, there is an upward trend for each month from April 1982 to December 2017. 
+
+[figure 5]
+Through the plot above, there is a clear upward trend for Supermarket and grocery stores retail turnover.Also, we can find the variance increases over time.
+For ACF, we can find the ACF decreases slowly and all lags are significant. 
+For PACF, we can find the first lag is quite large and positive.(close to 1)
+So, the time series is not stationary. we can say it is a non-stationary series.
+
+[All in all]we can find that the data has trend and seasonality. It can be seen clearly in figure 1 and figure 2, the trend is upward. Also, from figure 1, 2,3 and 4, we can find the seasonal variance is increasing over time , so we can say it has seasonality. Finally, we can say this is a non-stationary series from figure 5.
+```{r}
+### Time plot of Turnover [figure 1]
+myseries %>%
+  autoplot(Turnover)+ggtitle("time plot")+ylab("Turnover/millions$")
+### STL decomposition [figure 2]
+myseries %>%
+  model(STL(Turnover~trend(window=25)+season(window=35))) %>%
+  components() %>%
+  autoplot()
+
+### seasonal plot [figure 3]
+myseries %>%
+  gg_season(Turnover)+ggtitle("seasonal plot")
+
+### subseries plot [figure 4]
+myseries %>%
+ gg_subseries(Turnover)
+
+### tsdisplay plot [figure 5]
+myseries %>%
+  gg_tsdisplay(Turnover, plot_type = "partial")
+```
+
+
+
+
+###Q2 Explanation of transformations and differencing used. You should use a unit-root test as part of the discussion
+looking at the tsdisplay plot of Turnover to determine whether we use log-transformation or difference-transformation.
+```{r}
+myseries %>%
+  gg_tsdisplay(Turnover, plot_type = "partial")
+```
+#Steps 
+Making the data stationary
+[Step 1] Transform the data to regularize the variance.
+look at the time plot, we can find that we need to transform the data because the lower values of the Turnover have small variance and the larger values have large values.
+Also, the statistical property of the variance is changing over time, and we know that the statistical property of data is a function of time, thus we can say this is a non-stationary time series.
+Therefore, we need to transform the data to log(Turnover) in order to regularize this variance.
+```{r}
+myseries %>%
+  gg_tsdisplay(log(Turnover), plot_type = "partial")
+```
+we can find the time plot looks better through the log-transformation.
+
+## [Step 2] Seasonal difference
+# We can first judge whether a difference is needed through checking the ACF and PACF pictures.
+We can find that the time plot have many regular up and down patterns.
+For ACF, we can find there are more peaks at 12 and 24.
+For PACF, the value of lag 12 is a little bit large.
+So,we can see some seasonal structure in the plot. 
+On the other hand, the ACF decays quite slowly, and according to the PACF plot, the value of first lag is too large and positive.(nearly 1)
+Therefore, this is still a non-stationary data, and we need to use seasonal difference transformation.
+
+# Then we can use a unit-root test to verify our judgment.
+
+For the unit-root test, 
+null hypothesis: the data are stationary and non-seasonal.
+we can get p-value=0.01	 < 0.05 (at the 5%  level of the significance)
+So, we reject the null hypothesis.
+Thus, we can say that the data are not stationary at the 5% level of the significance.
+Therefore, we need to do seasonal difference.
+Also, the "unitroot_nsdiffs" tells us we do need to do one seasonal difference. (1 difference)
+```{r}
+## check use unit-root test
+myseries %>%
+  features(
+    log(Turnover), 
+    unitroot_kpss
+    )
+
+myseries %>%
+  features(
+    log(Turnover), 
+    features= unitroot_nsdiffs
+    )
+```
+
+```{r}
+myseries %>%
+  gg_tsdisplay(
+    difference(log(Turnover), lag=12), 
+    plot_type = "partial"
+    )
+```
+From this plot, we can find the seasonality is removed.
+
+[Step 3] Regular difference
+using unit-root test to determine whether we need to do further difference.
+```{r}
+myseries %>%
+  features(
+    difference(log(Turnover), lag=12), 
+    unitroot_kpss
+    )
+```
+For the unit-root test, 
+null hypothesis: the data are stationary and non-seasonal.
+we can get p-value=0.09684838 > 0.05 (at the 5%  level of the significance)
+So, we fail to reject the null hypothesis.
+Thus, we can say that the data are stationary and non-seasonal at the 5% level of the significance.
+Therefore, we do not need to do another difference.
+```{r}
+myseries %>%
+  features(
+    difference(log(Turnover), lag=12), 
+    features=list(unitroot_kpss, unitroot_nsdiffs)
+    )
+```
+we can find the times of another difference we need to use is 0. This means that in order to make the data stationary, we need to do 0 difference.In other word, this data set is already stationary. so we can just stop the transformation.
+
+In conclusion: we need to do a log-transformation and one seasonal difference transformation to make the data stationary.
+
+###Q3  A description of the methodology used to create a short-list of appropriate ARIMA models and ETS models. Include discussion of AIC values as well as results from applying the models to a test-set consisting of the last 24 months of data provided.
+
+Set test-set and training data.
+```{r}
+mytest_set<- myseries %>%
+  filter(Month > yearmonth("2015 Dec"))
+mytest_set
+
+my_training <- myseries %>%
+   filter(Month <= yearmonth("2015 Dec"))
+my_training
+```
+
+For the short-list ARIMA models, we look the ACF and PACF plots.
+[Shortlist of appropriate ARIMA models]
+First, we can manually select some possible suitable ARIMA models.
+Template: f(y)~ARIMA(p,d,q)(P,D,Q)[m]
+log(y)~ARIMA(p,d=0,q)(P,D=1,Q)[m]
+From the last question, we can know that D=1, d=0.
+There are so many significant values in ACF, so we can just look at the PACF plot to make it easier.so, q and Q should =0.
+Also,we can find from the original data time plot that original data has strong trend. So,we want our model to have trend. we know that if c is not equal to 0, and d=1, the long-term forecasts will follow a straight line.(will have a trend) Thus, we can know that this ARIMA model should have constant, which is log(y)~ARIMA(p=?,d=0,q=0)(P=?,D=1,Q=0)[12]+c
+
+For the choosing of p and P, according to the PACF plot, we can find the values of the first 3 or 4 lag is large, so we can try p=3 or 4. Also, we can find the value of lag 12 is significant, but the value of lag 24 is not small enough, so we can just try capital P=1 or 2.
+
+Also, we need to include the auto-model automatically selected by R.
+```{r}
+fit<-my_training %>%
+  model(
+    arima300110c=ARIMA(log(Turnover)~1+pdq(3,0,0)+PDQ(1,1,0)),
+    arima300210c=ARIMA(log(Turnover)~1+pdq(3,0,0)+PDQ(2,1,0)),
+    arima400110c=ARIMA(log(Turnover)~1+pdq(4,0,0)+PDQ(1,1,0)),
+    arima400210c=ARIMA(log(Turnover)~1+pdq(4,0,0)+PDQ(2,1,0)),
+    auto=ARIMA(log(Turnover)~pdq(d=0)+PDQ(D=1), trace = TRUE)
+  )
+fit
+glance(fit)
+```
+Compare with the models, we can find auto model have smallest AICc(-1669.605), so under this criteria the best model is auto model.
+auto is arima300211c=ARIMA(log(Turnover)~1+pdq(3,0,0)+PDQ(2,1,1))
+log(y)~ARIMA(p=3,d=0,q=0)(P=2,D=1,Q=1)[12]+c
+
+we can find from the plot below, auto model(arima300211c) is quite good.
+```{r}
+#best model is auto
+fit %>%
+  select(auto) %>%
+  tidy()
+
+fit %>%
+  select(auto) %>%
+  gg_tsresiduals()
+```
+
+
+
+using test set
+It choose the ARIMA300110c model with smallest RMSE(26.38899), MASE(1.375915), MAE(23.62618).
+```{r}
+fit11<-my_training %>%
+  model(
+    arima300110c=ARIMA(log(Turnover)~1+pdq(3,0,0)+PDQ(1,1,0)),
+    arima300210c=ARIMA(log(Turnover)~1+pdq(3,0,0)+PDQ(2,1,0)),
+    arima400110c=ARIMA(log(Turnover)~1+pdq(4,0,0)+PDQ(1,1,0)),
+    arima400210c=ARIMA(log(Turnover)~1+pdq(4,0,0)+PDQ(2,1,0)),
+    arima300211c_auto=ARIMA(log(Turnover)~1+pdq(3,0,0)+PDQ(2,1,1))
+  )
+fit11
+fit11%>%
+  forecast(mytest_set)%>%
+  accuracy(myseries)
+```
+
+
+[Shortlist of appropriate ETS models]
+```{r}
+### Time plot
+myseries%>%
+  autoplot(Turnover)+ggtitle("time plot")
+### STL decomposition
+myseries %>%
+  model(STL(Turnover~trend(window=25)+season(window=35))) %>%
+  components() %>%
+  autoplot()
+```
+
+we can find variance increase with time level, and the seasonal variance is also increase.
+So, we can get the seasonal component is multiplicative. By using an STL decomposition and looking at the pattern of the remainder term, I can find the variance of error term is increasing with the level ,Also, when looking at the original time plot, I can find the wiggles in the noise are not the same size. Therefore, it's a multiplicative error.
+So,we can just let ETS(Turnover~error("M")+trend("?")+season("M")).
+This means we can just compared the ETS models with different types of trend.(only change the trend component.)
+In other word, according to STL, we can find the variance is increasing over time, and the seasonality is changing over time, so we choose M for season, then we can find the error is also M.Then we only need to concentrate on the trend.
+
+Shortlist of appropriate ETS models:
+    mnm=ETS(Turnover~error("M")+trend("N")+season("M"))
+    mam=ETS(Turnover~error("M")+trend("A")+season("M"))
+    madm=ETS(Turnover~error("M")+trend("Ad")+season("M"))
+    auto=ETS(Turnover)(Also, we need to include the auto-model automatically selected by R.)
+
+we choose mam ,cause it has the smallest AICc(4071.666). And auto also choose mam model.
+```{r}
+fit_ETSauto <-my_training %>%
+  model(ETS(Turnover))
+report(fit_ETSauto)
+
+fit_ETS1 <-my_training %>%
+  model(
+    mnm=ETS(Turnover~error("M")+trend("N")+season("M")),
+    mam=ETS(Turnover~error("M")+trend("A")+season("M")),
+    madm=ETS(Turnover~error("M")+trend("Ad")+season("M")),
+    auto=ETS(Turnover)
+   )
+
+glance(fit_ETS1)
+tidy(fit_ETS1)
+```
+
+
+using test set.
+it choose the mam model with smallest RMSE(9.312996), MASE(0.4637291), MAE(7.962806).
+```{r}
+fit22<-my_training%>%
+  model(
+    mnm=ETS(Turnover~error("M")+trend("N")+season("M")),
+    mam_auto=ETS(Turnover~error("M")+trend("A")+season("M")),
+    madm=ETS(Turnover~error("M")+trend("Ad")+season("M")),
+  )
+
+fit22%>%
+  forecast(mytest_set)%>%
+  accuracy(myseries)
+```
+Compare with ETS and ARIMA model.
+it choose the mam model with smallest RMSE, MASE, MAE. So, we choose mam_auto model.
+```{r}
+fitall<-my_training%>%
+  model(
+    arima300110c=ARIMA(log(Turnover)~1+pdq(3,0,0)+PDQ(1,1,0)),
+    arima300210c=ARIMA(log(Turnover)~1+pdq(3,0,0)+PDQ(2,1,0)),
+    arima400110c=ARIMA(log(Turnover)~1+pdq(4,0,0)+PDQ(1,1,0)),
+    arima400210c=ARIMA(log(Turnover)~1+pdq(4,0,0)+PDQ(2,1,0)),
+    arima300211c_auto=ARIMA(log(Turnover)~1+pdq(3,0,0)+PDQ(2,1,1)),
+    mnm=ETS(Turnover~error("M")+trend("N")+season("M")),
+    mam_auto=ETS(Turnover~error("M")+trend("A")+season("M")),
+    madm=ETS(Turnover~error("M")+trend("Ad")+season("M")),
+  )
+
+fitall%>%
+  forecast(mytest_set)%>%
+  accuracy(myseries)
+```
+
+
+In conclusion, all of this choose the same model ETS(M,A,M) model.
+
+###Q4 Choose one ARIMA model and one ETS model based on this analysis and show parameter estimates, residual diagnostics, forecasts and prediction intervals for both models. Diagnostic checking for both models should include ACF graphs as well as the Ljung-Box test.
+
+ETS: I choose mam_auto=ETS(Turnover~error("M")+trend("A")+season("M"))
+Because both AICc and RMSE, MASE, MAE all choose that the mam model is the best.
+ARIMA: I choose arima300110c=ARIMA(log(Turnover)~1+pdq(3,0,0)+PDQ(1,1,0))
+Reason: we can know that AICc choose the model arima300211c, whereas the accuracy(RMSE, MASE, MAE) choose the model arima300110c.
+The reason why I choose arima300110c is because the difference of AICc between the two models are quite small, but the difference of RMSE, MASE, MAE of the two models are quite large.
+On the other hand, after checking the PACF plot, I can find lag 24 is not significant
+Therefore, I choose arima300110c model.
+
+parameter estimates: 
+For ETS model,
+alpha	0.2563736988 is not too large.
+beta 0.0194568855 is small, means it changes slowly.(not changing trend)
+gamma	0.0001010774	is close to 0, means seasonality not change over time.
+So, this is a quite good model.
+
+residual diagnostics: Diagnostic checking for both models should include ACF graphs as well as the Ljung-Box test.
+According to the ACF graphs, we can still see many significant lags, so it is still not good enough.
+For the Ljung-Box test, 
+For ETS model p-value=0 <0.05, so we reject the null. so, we can say residuals have autocorrelation at 5% significant interval.
+for ARIMA model, p-value=5.551115e-16 <0.05, so we reject the null.So, residuals have autocorrelation at 5% significant interval.
+
+For the forecast plot, we can see all models predict well. However, the ETS model forecasts better than ARIMA.
+```{r}
+fitETS <-my_training %>%
+  model(
+    mam=ETS(Turnover~error("M")+trend("A")+season("M"))
+  )
+fitETS
+report(fitETS)
+tidy(fitETS)
+
+fitARIMA <-my_training %>%
+  model(
+    arima300110c=ARIMA(log(Turnover)~1+pdq(3,0,0)+PDQ(1,1,0))
+  )
+fitARIMA
+report(fitARIMA)
+tidy(fitARIMA)
+
+### look at the residuals
+fitETS%>%
+  gg_tsresiduals()
+fitARIMA %>%
+  gg_tsresiduals()
+### ljung box test
+augment(fitETS) %>%
+  features(.resid,ljung_box,lag=24, dof=16)
+augment(fitARIMA) %>%
+  features(.resid,ljung_box,lag=24, dof=5)
+### look at some forecasts
+fcETS<-fitETS%>%
+  forecast(mytest_set)
+fcETS%>%
+  autoplot(myseries)+ggtitle("forecast graph for ETS model")
+fcARIMA<-fitARIMA%>%
+  forecast(mytest_set) 
+fcARIMA%>%
+  autoplot(myseries)+ggtitle("forecast graph for ARIMA model")
+```
+The prediction intervals of two models are shown as below.
+```{r}
+### prediction intervals
+fcETS %>%
+mutate(interval_ETS = hilo(Turnover, level = 80))%>%
+pull(interval_ETS)
+
+fcARIMA %>% 
+mutate(interval_ARIMA = hilo(Turnover, level = 80))%>%
+pull(interval_ARIMA)
+```
+
+###Q5 Comparison of the results from each of your preferred models. Which method do you think gives the better forecasts? Explain with reference to the test-set.
+I choose the mam model,
+1, mam model has the smallest RMSE, MASE, MAE. 
+2, according to the forecast plot, we can find that the prediction curve of mam model is more consistent with the test set data.
+All of these means that the mam model predicts more accurately.
+Therefore, I think ETS(M，A，M) model gives the better forecasts than ARIMA model.
+
+```{r}
+fit_Q5 <-my_training %>%
+  model(
+    mam=ETS(Turnover~error("M")+trend("A")+season("M")),
+    arima300110c=ARIMA(log(Turnover)~1+pdq(3,0,0)+PDQ(1,1,0))
+  )
+fit_Q5
+
+fc_q5<-fit_Q5 %>%
+  forecast(mytest_set)
+fc_q5 %>%
+  autoplot(myseries, level=NULL)+ggtitle("Forecast plot for ETS and ARIMA models")
+fc_q5 %>%
+  autoplot(myseries, alpha=0.8)+ggtitle("Forecast plot for ETS and ARIMA models with level")
+fc_q5 %>%
+  accuracy(myseries)
+
+### plot separately
+## For ETS model
+fit_Q5ETS<-my_training %>%
+  model(
+    mam=ETS(Turnover~error("M")+trend("A")+season("M"))
+  )
+fc_Q5ETS<-fit_Q5ETS %>%
+  forecast(mytest_set)
+fc_Q5ETS %>%
+  autoplot(myseries, color="blue")+ggtitle("Forecast of selected ETS model")
+
+### For ARIMA model
+fit_Q5ARIMA<-my_training %>%
+  model(
+   arima300110c=ARIMA(log(Turnover)~1+pdq(3,0,0)+PDQ(1,1,0))
+  )
+fc_Q5ARIMA<-fit_Q5ARIMA %>%
+  forecast(mytest_set)
+fc_Q5ARIMA %>%
+  autoplot(myseries)+ggtitle("Forecast of selected ARIMA model")
+```
+
+###Q6 Apply your two chosen models to the full data set and produce out-of-sample point forecasts and 80% prediction intervals for each model for two years past the end of the data provided.
+we can find the out-of-sample point forecasts is the mean in the output table 3.
+80% prediction intervals for each model are also shown as below.
+```{r}
+### Set ETS and ARIMA model together.
+fit_Q6 <-myseries %>%
+  model(
+    mam=ETS(Turnover~error("M")+trend("A")+season("M")),
+    arima300110c=ARIMA(log(Turnover)~1+pdq(3,0,0)+PDQ(1,1,0))
+  )
+fit_Q6
+## Forecast for 2 years.
+fc_q6<-fit_Q6 %>%
+  forecast(h="2 years")
+# plot the forecast graphs of the two models on one graph for comparison.
+fc_q6 %>%
+  autoplot(myseries, level=NULL)+ggtitle("Forecasts of selected ETS and ARIMA models")
+# Get the point forecasts, which is mean.
+fc_q6
+
+
+### Find the prediction intervals of each model separately
+## For ETS model
+fit_Q6ETS<-myseries %>%
+  model(
+    mam=ETS(Turnover~error("M")+trend("A")+season("M"))
+  )
+fc_Q6ETS<-fit_Q6ETS %>%
+  forecast(h="2 years")
+fc_Q6ETS %>%
+  autoplot(myseries, level=NULL)+ggtitle("Forecast of selected ETS model")
+fc_Q6ETS %>%
+mutate(intervalQ6ETS = hilo(Turnover, level = 80))%>%
+pull(intervalQ6ETS)
+
+### For ARIMA model
+fit_Q6ARIMA<-myseries %>%
+  model(
+   arima300110c=ARIMA(log(Turnover)~1+pdq(3,0,0)+PDQ(1,1,0))
+  )
+fc_Q6ARIMA<-fit_Q6ARIMA %>%
+  forecast(h="2 years")
+fc_Q6ARIMA %>%
+  autoplot(myseries, level=NULL)+ggtitle("Forecast of selected ARIMA model")
+fc_Q6ARIMA %>%
+mutate(intervalQ6ARIMA = hilo(Turnover, level = 80))%>%
+pull(intervalQ6ARIMA)
+```
+
+
+###Q7 Obtain up-to-date data from the ABS website (Cat. 8501.0, Table 11), and compare your forecasts with the actual numbers. How well did you do? [Hint: the readabs package can help in getting the data into R.]
+
+```{r}
+library(readabs)
+```
+
+```{r}
+ABSDATA<-read_abs(series_id = "A3349654A", tables =11) %>%
+  separate_series()
+ABSDATA
+```
+
+
+```{r}
+mydata<-ABSDATA %>%
+   mutate(State=series_2, Industry=series_3, Turnover=value, Month=yearmonth(date)) %>%
+  select(State, Industry, Month, Turnover)%>%
+   as_tsibble(index=Month) 
+mydata
+```
+
+```{r}
+fitq7<-myseries %>%
+  model(
+    mam=ETS(Turnover~error("M")+trend("A")+season("M")),
+    arima300110c=ARIMA(log(Turnover)~1+pdq(3,0,0)+PDQ(1,1,0))
+  ) 
+## Forecast for 39 months.
+fcq7<-fitq7 %>%
+  forecast(h=39)
+# plot the forecast graphs of the two models on one graph for comparison.
+fcq7%>%
+  autoplot(myseries,level=NULL)+ggtitle("Forecasts of selected ETS and ARIMA models Using ABS real data")+autolayer(mydata,Turnover)
+
+fcq7%>%
+  autoplot(myseries,alpha=0.8)+ggtitle("Forecasts of selected ETS and ARIMA models Using ABS real data with level")+autolayer(mydata,Turnover)
+
+fcq7 %>%
+  accuracy(mydata)
+
+### separate plot
+## For ETS model
+fit_Q7ETS<-myseries %>%
+  model(
+    mam=ETS(Turnover~error("M")+trend("A")+season("M"))
+  )
+fc_Q7ETS<-fit_Q7ETS %>%
+  forecast(h=39)
+fc_Q7ETS %>%
+  autoplot(myseries, color="blue")+ggtitle("Forecast of selected ETS model")+autolayer(mydata,Turnover)
+
+### For ARIMA model
+fit_Q7ARIMA<-myseries %>%
+  model(
+   arima300110c=ARIMA(log(Turnover)~1+pdq(3,0,0)+PDQ(1,1,0))
+  )
+fc_Q7ARIMA<-fit_Q7ARIMA %>%
+  forecast(h=39)
+fc_Q7ARIMA %>%
+  autoplot(myseries)+ggtitle("Forecast of selected ARIMA model")+autolayer(mydata,Turnover)
+```
+
+By comparing the forecast graphs of the two models, it can be found that they both capture the trend and seasonality of the data very well.
+By looking at the picture, we can find that the ARIMA model predicts a bit more accurately. It can better capture some data changes in the short term,also can cover more trend information.
+But by comparing accuracy, we can find that ETS is better because it has the smallest RMSE, MASE, MAE.
+Due to the COVID-19 we can know the supermarket Turnover will increase quickly than usual, but both ETS and ARIMA cannot forecast this kind of emergency.
+In my set of data, the impact of COVID-19 is not large, so both models predict very well.
+
+###Q8 A discussion of benefits and limitations of the models for your data.
+
+ETS model(M,A,M):
+Benefits: 
+1，the accuracy of forecast is quiet good no matter in the test-set or in the ABS real data set.(the RMSE, MASE, MAE are all the smallest one compared with other models.)
+2, When looking at the plot, we can find it captures the trend and seasonality of the data very well.
+3, Because it has not been affected by the COVID-19, it maintains an upward trend and the seasonality is also not affected, so its trend and seasonality are well predicted.
+4, This model is relatively simple, requiring only endogenous variables and not exogenous variables.
+5,the long-term forecast will be more accurate for ETS model.
+Limitations:
+1,After the COVID-19, the turnover growth of the supermarket retail industry may slow down, but the ETS model will still predict continued growth, so future forecasts may be less accurate.
+2,Its long-term forecast will be more accurate, because it is difficult to capture some short-term fluctuations.
+3,It is impossible to predict when the data changes suddenly, so it is difficult to predict some extreme emergencies.
+4, It can be used for non-stationary data.
+
+ARIMA model(ARIMA300110c):
+Benefits:
+1,This model is relatively simple, requiring only endogenous variables and not exogenous variables.
+2, Through the prediction plot, I can find that when combined with the actual data of ABS, the ARIMA prediction looks better, although its RMSE value is not as good as the ETS model.
+
+3, ARIMA model forecast in the short term is more accurate because it can capture some short-term fluctuations. Therefore, when the trend changes, the ARIMA model can better capture this change, which will make the forecast more accurate.
+4, this model does not lead to much understanding of a system.
+Limitations:
+1,The model is stationary after log-transformation and seasonal difference, so essentially it can only capture linear relationships, but not nonlinear relationships.
+2, The prediction interval of this model will become wider and wider, which may be less accurate
+3, It mainly refers to its own data, but does not consider the influence of external factors. Therefore, for some emergencies, the model is difficult to predict.
+4, It can only be used for stationary data set.
+
+### CONCLUSION
+This report found that ETS models perform better for long-term forecast. And ARIMA model perform better for short-term forecast. All of the models are mainly refer to its own data, but does not consider the influence of external factors. Therefore, for some emergencies(such as COVID-19), the model is difficult to forecast.
+
+
+
+
+
+
+
