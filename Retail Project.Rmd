@@ -1,9 +1,3 @@
----
-title: "3550 Retail Project"
-author: "Mengyu Sun 30864933"
-date: "2021/5/28"
-output: html_document
----
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
